@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Simulação de Ecossistema Complexo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="simulation">
+      <canvas id="canvas"></canvas>
+    </div>
+    <div class="stats-panel">
+      <h2>Estatísticas do Ambiente</h2>
+      <div id="environment-stats"></div>
+      
+      <h2>Análise Populacional</h2>
+      <div id="population-stats"></div>
+      
+      <h2>Eventos Históricos</h2>
+      <div id="historical-events"></div>
+      
+      <h2>Insights</h2>
+      <div id="insights"></div>
+    </div>
+  </div>
+  <script src="simulation.js"></script>
+  <script>
+    // Ajusta o tamanho do canvas quando a janela é redimensionada
+    window.addEventListener('resize', () => {
+      const canvas = document.getElementById('canvas');
+      canvas.width = window.innerWidth - 300; // Subtrai a largura do painel de estatísticas
+      canvas.height = window.innerHeight;
+    });
+  </script>
+</body>
+</html>
