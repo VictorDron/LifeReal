@@ -1,36 +1,63 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulação de Ecossistema Complexo</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
-    <div class="simulation">
-      <canvas id="canvas"></canvas>
-    </div>
-    <div class="stats-panel">
-      <h2>Estatísticas do Ambiente</h2>
-      <div id="environment-stats"></div>
+    <canvas id="canvas"></canvas>
+    <div class="sidebar">
+      <div id="environment-stats" class="panel">
+        <h3>Ambiente</h3>
+        <!-- Estatísticas do ambiente serão atualizadas via JavaScript -->
+      </div>
+
+      <div id="population-stats" class="panel">
+        <h3>População</h3>
+        <!-- Estatísticas da população serão atualizadas via JavaScript -->
+      </div>
+
+      <div id="stats-panel" class="panel">
+        <h3>Estatísticas</h3>
+        <!-- Estatísticas gerais serão atualizadas via JavaScript -->
+      </div>
       
-      <h2>Análise Populacional</h2>
-      <div id="population-stats"></div>
-      
-      <h2>Eventos Históricos</h2>
-      <div id="historical-events"></div>
-      
-      <h2>Insights</h2>
-      <div id="insights"></div>
+      <div id="events-panel" class="panel">
+        <h3>Eventos Recentes</h3>
+        <!-- Eventos serão atualizados via JavaScript -->
+      </div>
+
+      <div id="insights" class="panel">
+        <h3>Insights</h3>
+        <!-- Insights serão atualizados via JavaScript -->
+      </div>
+
+      <div id="controls" class="panel">
+        <h3>Controles</h3>
+        <button onclick="ENVIRONMENT.catastropheChance *= 2">Aumentar Chance de Catástrofe</button>
+        <button onclick="ENVIRONMENT.resourceScarcity = Math.min(1, ENVIRONMENT.resourceScarcity + 0.1)">Aumentar Escassez</button>
+        <button onclick="ENVIRONMENT.resourceScarcity = Math.max(0, ENVIRONMENT.resourceScarcity - 0.1)">Diminuir Escassez</button>
+        <button onclick="for(let i=0; i<10; i++) spawnFood()">Adicionar Comida</button>
+      </div>
+
+      <div id="legend" class="panel">
+        <h3>Legenda</h3>
+        <p>🟢 Comida Normal</p>
+        <p>🟡 Comida Especial (Bônus)</p>
+        <p>🌋 Área de Catástrofe</p>
+        <p>🔵 Células (Cor varia por genes)</p>
+      </div>
     </div>
   </div>
   <script src="simulation.js"></script>
   <script>
-    // Ajusta o tamanho do canvas quando a janela é redimensionada
-    window.addEventListener('resize', () => {
-      const canvas = document.getElementById('canvas');
-      canvas.width = window.innerWidth - 300; // Subtrai a largura do painel de estatísticas
-      canvas.height = window.innerHeight;
+    // Inicia a simulação quando a página carregar
+    window.addEventListener('load', function() {
+      // Pequeno delay para garantir que todos os elementos foram carregados
+      setTimeout(startSimulation, 100);
     });
   </script>
 </body>

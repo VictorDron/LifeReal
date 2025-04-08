@@ -1,8 +1,36 @@
 // Configura o canvas e estatísticas
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth - 300; // Subtrai a largura do painel de estatísticas
-canvas.height = window.innerHeight;
+let canvas, ctx;
+
+function initCanvas() {
+  try {
+    canvas = document.getElementById("canvas");
+    if (!canvas) {
+      throw new Error("Canvas element not found");
+    }
+    
+    ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Could not get canvas context");
+    }
+    
+    // Ajusta o tamanho do canvas
+    function resizeCanvas() {
+      canvas.width = window.innerWidth - 300; // Subtrai a largura do painel de estatísticas
+      canvas.height = window.innerHeight;
+    }
+    
+    // Ajusta o tamanho inicial
+    resizeCanvas();
+    
+    // Adiciona listener para redimensionamento
+    window.addEventListener('resize', resizeCanvas);
+    
+    return true;
+  } catch (error) {
+    console.error("Error initializing canvas:", error);
+    return false;
+  }
+}
 
 // Variáveis globais do ambiente
 const ENVIRONMENT = {
@@ -55,6 +83,47 @@ class Resource {
     this.scarcity = scarcity;
   }
 }
+
+// Sistema de catástrofes
+class Catastrophe {
+  constructor(type, x, y) {
+    this.type = type;
+    this.x = x;
+    this.y = y;
+    this.radius = type === 'earthquake' ? 100 : 150;
+    this.duration = type === 'earthquake' ? 100 : 300;
+    this.intensity = rand(0.5, 1);
+    this.age = 0;
+    this.active = true;
+  }
+
+  update() {
+    this.age++;
+    if (this.age >= this.duration) {
+      this.active = false;
+    }
+  }
+
+  draw(ctx) {
+    if (!this.active) return;
+    
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = this.type === 'earthquake' ? 
+      `rgba(139, 69, 19, ${0.3 * (1 - this.age/this.duration)})` : 
+      `rgba(255, 0, 0, ${0.3 * (1 - this.age/this.duration)})`;
+    ctx.fill();
+  }
+
+  affects(cell) {
+    if (!this.active) return false;
+    const distance = Math.hypot(this.x - cell.x, this.y - cell.y);
+    return distance <= this.radius;
+  }
+}
+
+// Lista global de catástrofes ativas
+const activeCatastrophes = [];
 
 // Classe que representa uma célula na simulação
 class Cell {
@@ -133,6 +202,40 @@ class Cell {
     // Atualiza o cooldown de reprodução
     if (this.reproCooldown > 0) {
       this.reproCooldown -= 1;
+    }
+
+    // Reação a catástrofes
+    for (const catastrophe of activeCatastrophes) {
+      if (catastrophe.affects(this)) {
+        // Dano baseado no tipo de catástrofe e resiliência da célula
+        const damage = catastrophe.intensity * (1 - this.genes.resilience);
+        this.energy -= damage * 10;
+        this.health.injuries += damage;
+
+        // Fuga da área de catástrofe
+        const dx = this.x - catastrophe.x;
+        const dy = this.y - catastrophe.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0) {
+          this.dx = (dx / dist) * 3; // Velocidade de fuga aumentada
+          this.dy = (dy / dist) * 3;
+        }
+
+        // Adaptação genética gradual
+        if (Math.random() < 0.1) {
+          this.genes.resilience = Math.min(1, this.genes.resilience + 0.01);
+        }
+      }
+    }
+
+    // Verificar por comida próxima
+    for (let i = foods.length - 1; i >= 0; i--) {
+      const food = foods[i];
+      const distance = Math.hypot(this.x - food.x, this.y - food.y);
+      
+      if (distance < this.radius + food.radius) {
+        this.eat(food);
+      }
     }
   }
   
@@ -245,6 +348,26 @@ class Cell {
       ));
     }
   }
+
+  eat(food) {
+    const energyGain = food.type === 'special' ? 
+      food.energy * 1.5 : // Bônus para comida especial
+      food.energy;
+    
+    this.energy += energyGain;
+    
+    // Chance de aprender com comida especial
+    if (food.type === 'special' && Math.random() < this.genes.intelligence) {
+      this.knowledge += 0.1;
+      this.recordHistoricalEvent('Learned from special food');
+    }
+    
+    // Remove a comida consumida
+    const index = foods.indexOf(food);
+    if (index > -1) {
+      foods.splice(index, 1);
+    }
+  }
 }
 
 // Classe que representa o alimento (recurso econômico) no ambiente
@@ -252,14 +375,18 @@ class Food {
   constructor(x, y) {
     this.x = x;
     this.y = y;
-    this.energy = 70;
+    this.energy = rand(30, 50);
     this.radius = 3;
+    this.type = Math.random() < 0.3 ? 'special' : 'normal';
+    this.color = this.type === 'special' ? 
+      `rgb(255, 215, 0)` : // Dourado para comida especial
+      `rgb(0, ${Math.floor(rand(150, 255))}, 0)`; // Verde para comida normal
   }
   
   draw(ctx) {
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#0f0';  // alimento exibido em verde
+    ctx.fillStyle = this.color;
     ctx.fill();
   }
 }
@@ -268,14 +395,54 @@ class Food {
 let cells = [];
 let foods = [];
 
-// Inicializa algumas células de partida
-for (let i = 0; i < 30; i++) {
-  cells.push(new Cell(rand(0, canvas.width), rand(0, canvas.height)));
+// Inicialização da simulação
+function initSimulation() {
+  if (!initCanvas()) {
+    console.error("Failed to initialize simulation due to canvas error");
+    return false;
+  }
+
+  // Limpa arrays existentes
+  cells = [];
+  foods = [];
+  HISTORICAL_EVENTS.length = 0;
+
+  // Cria população inicial de 30 células
+  for (let i = 0; i < 30; i++) {
+    cells.push(new Cell(
+      rand(0, canvas.width),
+      rand(0, canvas.height)
+    ));
+  }
+
+  // Cria comida inicial
+  for (let i = 0; i < 50; i++) {
+    foods.push(new Food(
+      rand(0, canvas.width),
+      rand(0, canvas.height)
+    ));
+  }
+
+  HISTORICAL_EVENTS.push({
+    event: 'Simulation Started',
+    time: Date.now(),
+    initialPopulation: 30,
+    type: 'system'
+  });
+
+  return true;
 }
 
 // Função para gerar alimento aleatoriamente na tela
 function spawnFood() {
-  foods.push(new Food(rand(0, canvas.width), rand(0, canvas.height)));
+  const baseSpawnRate = 0.1;
+  const scarcityFactor = Math.max(0.2, 1 - ENVIRONMENT.resourceScarcity);
+  
+  if (Math.random() < baseSpawnRate * scarcityFactor) {
+    const x = rand(0, canvas.width);
+    const y = rand(0, canvas.height);
+    foods.push(new Food(x, y));
+  }
 }
 
 // Função que calcula o custo de reprodução de forma dinâmica
@@ -285,45 +452,67 @@ function getReproductionCost() {
 
 // Tenta reproduzir duas células próximas e com energia suficiente
 function tryReproduce(cell1, cell2) {
-  const dx = cell1.x - cell2.x;
-  const dy = cell1.y - cell2.y;
-  const dist = Math.hypot(dx, dy);
-  // Se as células estão próximas
-  if (dist < cell1.radius + cell2.radius + 5) {
-    const reproCost = getReproductionCost();
-    // Verifica se ambas têm energia acima do custo e não estão em cooldown
-    if (cell1.energy > reproCost && cell2.energy > reproCost &&
-        cell1.reproCooldown <= 0 && cell2.reproCooldown <= 0) {
-      
-      // Combina os genes dos pais com uma mutação leve
-      let newGenes = {
-        r: Math.floor((cell1.genes.r + cell2.genes.r) / 2 + rand(-10, 10)),
-        g: Math.floor((cell1.genes.g + cell2.genes.g) / 2 + rand(-10, 10)),
-        b: Math.floor((cell1.genes.b + cell2.genes.b) / 2 + rand(-10, 10))
-      };
-      // Ajusta os valores para que fiquem entre 0 e 255
-      newGenes.r = Math.min(255, Math.max(0, newGenes.r));
-      newGenes.g = Math.min(255, Math.max(0, newGenes.g));
-      newGenes.b = Math.min(255, Math.max(0, newGenes.b));
-      
-      // Determina a nova taxa de metabolismo herdada dos pais (com mutação pequena)
-      let newMetabolism = ((cell1.metabolismRate + cell2.metabolismRate) / 2) + rand(-0.01, 0.01);
-      newMetabolism = Math.min(0.2, Math.max(0.05, newMetabolism));
-      
-      // Cria a nova célula (descendente) próximo à posição do pai
-      const offspring = new Cell(cell1.x, cell1.y, newGenes, newMetabolism);
-      offspring.energy = 80;
-      cells.push(offspring);
-      
-      // Deduz o custo da reprodução de ambos os pais
-      cell1.energy -= reproCost * 0.8;
-      cell2.energy -= reproCost * 0.8;
-      
-      // Define um cooldown para evitar reprodução imediata novamente
-      cell1.reproCooldown = 60;
-      cell2.reproCooldown = 60;
-    }
+  if (cell1.reproCooldown > 0 || cell2.reproCooldown > 0) return null;
+  
+  const distance = Math.hypot(cell1.x - cell2.x, cell1.y - cell2.y);
+  if (distance > 15) return null;
+
+  const reproductionCost = getReproductionCost();
+  
+  // Verifica energia suficiente
+  if (cell1.energy < reproductionCost || cell2.energy < reproductionCost) return null;
+
+  // Chance de reprodução baseada na compatibilidade genética
+  const geneticCompatibility = 1 - Math.abs(cell1.genes.adaptability - cell2.genes.adaptability);
+  if (Math.random() > geneticCompatibility) return null;
+
+  // Deduz o custo de energia
+  cell1.energy -= reproductionCost;
+  cell2.energy -= reproductionCost;
+  
+  // Define cooldown de reprodução
+  cell1.reproCooldown = 60;
+  cell2.reproCooldown = 60;
+
+  // Cria nova célula com genes combinados
+  const childGenes = {
+    r: Math.floor((cell1.genes.r + cell2.genes.r) / 2 + rand(-10, 10)),
+    g: Math.floor((cell1.genes.g + cell2.genes.g) / 2 + rand(-10, 10)),
+    b: Math.floor((cell1.genes.b + cell2.genes.b) / 2 + rand(-10, 10)),
+    adaptability: (cell1.genes.adaptability + cell2.genes.adaptability) / 2 + rand(-0.05, 0.05),
+    intelligence: (cell1.genes.intelligence + cell2.genes.intelligence) / 2 + rand(-0.05, 0.05),
+    resilience: (cell1.genes.resilience + cell2.genes.resilience) / 2 + rand(-0.05, 0.05)
+  };
+
+  // Mutações ocasionais
+  if (Math.random() < 0.1) {
+    const geneToMutate = ['adaptability', 'intelligence', 'resilience'][Math.floor(rand(0, 3))];
+    childGenes[geneToMutate] += rand(-0.1, 0.1);
+    childGenes[geneToMutate] = Math.max(0, Math.min(1, childGenes[geneToMutate]));
   }
+
+  // Cria nova célula
+  const child = new Cell(
+    (cell1.x + cell2.x) / 2 + rand(-10, 10),
+    (cell1.y + cell2.y) / 2 + rand(-10, 10),
+    childGenes,
+    (cell1.metabolismRate + cell2.metabolismRate) / 2 + rand(-0.01, 0.01)
+  );
+
+  // Herança de conhecimento
+  child.knowledge = (cell1.knowledge + cell2.knowledge) * 0.6;
+  child.generation = Math.max(cell1.generation, cell2.generation) + 1;
+
+  // Registra evento histórico
+  HISTORICAL_EVENTS.push({
+    event: 'New Cell Born',
+    time: Date.now(),
+    parents: [cell1, cell2],
+    generation: child.generation,
+    type: 'reproduction'
+  });
+
+  return child;
 }
 
 // Nova classe para grupos sociais
@@ -422,75 +611,77 @@ function updateEnvironment() {
 }
 
 function triggerCatastrophicEvent() {
-  const events = [
-    { name: 'Natural Disaster', impact: 0.5 },
-    { name: 'Disease Outbreak', impact: 0.3 },
-    { name: 'Climate Change', impact: 0.2 }
-  ];
+  if (Math.random() > ENVIRONMENT.catastropheChance) return;
+
+  const type = Math.random() < 0.5 ? 'earthquake' : 'wildfire';
+  const x = rand(0, canvas.width);
+  const y = rand(0, canvas.height);
   
-  const event = events[Math.floor(Math.random() * events.length)];
+  const catastrophe = new Catastrophe(type, x, y);
+  activeCatastrophes.push(catastrophe);
+  
+  // Registra o evento histórico
   HISTORICAL_EVENTS.push({
-    event: event.name,
+    event: `${type.charAt(0).toUpperCase() + type.slice(1)} occurred`,
+    location: `at (${Math.round(x)}, ${Math.round(y)})`,
     time: Date.now(),
-    impact: event.impact,
-    environmentState: {...ENVIRONMENT}
-  });
-  
-  // Aplicar efeitos do evento
-  cells.forEach(cell => {
-    if (Math.random() < event.impact) {
-      cell.energy *= (1 - event.impact);
-      cell.health.injuries += event.impact * 10;
-    }
+    type: 'catastrophe',
+    intensity: catastrophe.intensity,
+    radius: catastrophe.radius
   });
 }
 
 // Função principal de atualização
 function updateSimulation() {
-  updateEnvironment();
-  
-  // Spawn de comida com mais frequência
-  if (Math.random() < 0.2 / ENVIRONMENT.resourceScarcity) {
-    spawnFood();
-  }
-  
-  // Atualização das células
-  for (let cell of cells) {
-    cell.think();
-    cell.update();
-    
-    // Interações sociais
-    if (cell.tribe) {
-      cell.tribe.update();
-    } else if (Math.random() < cell.socialBehavior.cooperation) {
-      tryFormTribe(cell);
-    }
-    
-    // Chance de ganhar energia naturalmente (simulando fotossíntese ou recurso passivo)
-    if (Math.random() < 0.1) {
-      cell.energy += 2;
+  // Atualiza células
+  for (let i = cells.length - 1; i >= 0; i--) {
+    cells[i].update();
+    cells[i].think();
+
+    // Remove células mortas
+    if (cells[i].energy <= 0 || cells[i].age > 300) {
+      HISTORICAL_EVENTS.push({
+        event: `Cell died at age ${Math.floor(cells[i].age)}`,
+        time: Date.now(),
+        cause: cells[i].energy <= 0 ? 'starvation' : 'old age',
+        type: 'death'
+      });
+      cells.splice(i, 1);
+      continue;
     }
   }
-  
-  // Remove células mortas com idade mais alta
-  cells = cells.filter(cell => cell.energy > 0 && cell.age < 300);
-  
-  // Tenta reprodução entre células
+
+  // Tenta reprodução entre células próximas
   for (let i = 0; i < cells.length; i++) {
     for (let j = i + 1; j < cells.length; j++) {
-      tryReproduce(cells[i], cells[j]);
+      const child = tryReproduce(cells[i], cells[j]);
+      if (child) {
+        cells.push(child);
+      }
     }
   }
-  
-  // Análise e registro de dados
-  if (cells.length % 100 === 0) {
-    analyzePopulationData();
+
+  // Gera novo alimento
+  spawnFood();
+
+  // Atualiza ambiente
+  updateEnvironment();
+
+  // Chance de catástrofe
+  if (Math.random() < ENVIRONMENT.catastropheChance) {
+    triggerCatastrophicEvent();
   }
-  
-  // Atualiza a interface a cada 30 frames
-  if (frameCount % 30 === 0) {
-    updateInterface();
+
+  // Atualiza catástrofes ativas
+  for (let i = activeCatastrophes.length - 1; i >= 0; i--) {
+    activeCatastrophes[i].update();
+    if (!activeCatastrophes[i].active) {
+      activeCatastrophes.splice(i, 1);
+    }
   }
+
+  // Atualiza interface
+  updateInterface();
 }
 
 function analyzePopulationData() {
@@ -525,21 +716,196 @@ function drawSimulation() {
   for (let cell of cells) {
     cell.draw(ctx);
   }
+
+  // Desenha catástrofes
+  for (const catastrophe of activeCatastrophes) {
+    catastrophe.draw(ctx);
+  }
 }
 
 // Adiciona contador de frames
 let frameCount = 0;
+let animationId = null;
 
-// Modifica a função animate para incluir o contador de frames
+// Modifica a função animate para incluir o contador de frames e tratamento de erro
 function animate() {
-  frameCount++;
-  updateSimulation();
-  drawSimulation();
-  requestAnimationFrame(animate);
+  try {
+    frameCount++;
+    
+    // Atualiza a simulação
+    updateSimulation();
+    
+    // Desenha o frame atual
+    drawSimulation();
+    
+    // Agenda o próximo frame
+    animationId = requestAnimationFrame(animate);
+  } catch (error) {
+    console.error("Error in animation loop:", error);
+    
+    // Tenta recuperar a simulação
+    if (animationId) {
+      cancelAnimationFrame(animationId);
+      animationId = null;
+    }
+    
+    // Registra o erro nos eventos históricos
+    HISTORICAL_EVENTS.push({
+      event: 'Simulation Error',
+      time: Date.now(),
+      error: error.message,
+      type: 'system'
+    });
+    
+    // Tenta reiniciar a simulação após 1 segundo
+    setTimeout(() => {
+      if (!animationId) {
+        console.log("Attempting to restart animation...");
+        animationId = requestAnimationFrame(animate);
+      }
+    }, 1000);
+  }
 }
 
-// Inicia a simulação
-animate();
+// Função para iniciar a simulação
+function startSimulation() {
+  try {
+    if (initSimulation()) {
+      if (!animationId) {
+        animationId = requestAnimationFrame(animate);
+        console.log("Simulation started successfully");
+      }
+    } else {
+      throw new Error("Failed to initialize simulation");
+    }
+  } catch (error) {
+    console.error("Error starting simulation:", error);
+    alert("Erro ao iniciar a simulação. Por favor, recarregue a página.");
+  }
+}
+
+// Função para formatar eventos históricos
+function formatHistoricalEvent(event) {
+  const timeStr = new Date(event.time).toLocaleTimeString();
+  let message = `[${timeStr}] `;
+
+  switch (event.type) {
+    case 'catastrophe':
+      message += `🌋 ${event.event} ${event.location} (Intensidade: ${event.intensity.toFixed(2)})`;
+      break;
+    case 'reproduction':
+      message += `🐣 ${event.event} (Geração ${event.generation})`;
+      break;
+    case 'system':
+      message += `🔄 ${event.event}`;
+      break;
+    case 'death':
+      message += `💀 ${event.event} (Causa: ${event.cause})`;
+      break;
+    default:
+      message += `📝 ${event.event}`;
+  }
+
+  return message;
+}
+
+// Função para atualizar a interface
+function updateInterface() {
+  try {
+    // Atualiza estatísticas do ambiente
+    const envStats = document.getElementById('environment-stats');
+    if (envStats) {
+      envStats.innerHTML = `
+        <h3>Ambiente</h3>
+        <div class="stat-item">
+          <span>Estação:</span>
+          <span>${ENVIRONMENT.currentSeason}</span>
+        </div>
+        <div class="stat-item">
+          <span>Temperatura:</span>
+          <span>${ENVIRONMENT.temperature.toFixed(1)}°C</span>
+        </div>
+        <div class="stat-item">
+          <span>Escassez:</span>
+          <span>${ENVIRONMENT.resourceScarcity.toFixed(2)}</span>
+        </div>
+      `;
+    }
+
+    // Atualiza estatísticas da população
+    const popStats = document.getElementById('population-stats');
+    if (popStats) {
+      const stats = {
+        population: cells.length,
+        avgIntelligence: cells.length > 0 ? 
+          cells.reduce((sum, cell) => sum + cell.genes.intelligence, 0) / cells.length : 
+          0,
+        tribes: cells.filter(cell => cell.tribe).length
+      };
+
+      popStats.innerHTML = `
+        <h3>População</h3>
+        <div class="stat-item">
+          <span>Total:</span>
+          <span>${stats.population}</span>
+        </div>
+        <div class="stat-item">
+          <span>Inteligência Média:</span>
+          <span>${stats.avgIntelligence.toFixed(2)}</span>
+        </div>
+        <div class="stat-item">
+          <span>Tribos:</span>
+          <span>${stats.tribes}</span>
+        </div>
+      `;
+    }
+
+    // Atualiza painel de eventos históricos
+    const eventsPanel = document.getElementById('events-panel');
+    if (eventsPanel) {
+      const recentEvents = HISTORICAL_EVENTS.slice(-10).reverse();
+      eventsPanel.innerHTML = `
+        <h3>Eventos Recentes</h3>
+        ${recentEvents.map(formatHistoricalEvent).join('<br>')}
+      `;
+    }
+
+    // Atualiza estatísticas gerais
+    const statsPanel = document.getElementById('stats-panel');
+    if (statsPanel) {
+      const stats = {
+        population: cells.length,
+        avgEnergy: cells.reduce((sum, cell) => sum + cell.energy, 0) / cells.length || 0,
+        avgResilience: cells.reduce((sum, cell) => sum + cell.genes.resilience, 0) / cells.length || 0,
+        foodAvailable: foods.length,
+        activeCatastrophes: activeCatastrophes.length,
+        highestGeneration: Math.max(...cells.map(cell => cell.generation || 0), 0)
+      };
+
+      statsPanel.innerHTML = `
+        <h3>Estatísticas</h3>
+        <p>População: ${stats.population}</p>
+        <p>Energia Média: ${stats.avgEnergy.toFixed(1)}</p>
+        <p>Resiliência Média: ${stats.avgResilience.toFixed(3)}</p>
+        <p>Comida Disponível: ${stats.foodAvailable}</p>
+        <p>Catástrofes Ativas: ${stats.activeCatastrophes}</p>
+        <p>Maior Geração: ${stats.highestGeneration}</p>
+      `;
+    }
+
+    // Atualiza insights
+    const insightsPanel = document.getElementById('insights');
+    if (insightsPanel) {
+      const currentInsights = generateInsights();
+      insightsPanel.innerHTML = `
+        <h3>Insights</h3>
+        ${currentInsights.map(insight => `<p>${insight}</p>`).join('')}
+      `;
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar interface:', error);
+  }
+}
 
 // Funções faltantes
 function updateResourceScarcity() {
@@ -591,69 +957,6 @@ function tryFormTribe(cell) {
       }
     }
   }
-}
-
-// Função para atualizar a interface
-function updateInterface() {
-  // Atualiza estatísticas do ambiente
-  const envStats = document.getElementById('environment-stats');
-  envStats.innerHTML = `
-    <div class="stat-item">
-      <span>Estação:</span>
-      <span>${ENVIRONMENT.currentSeason}</span>
-    </div>
-    <div class="stat-item">
-      <span>Temperatura:</span>
-      <span>${ENVIRONMENT.temperature.toFixed(1)}°C</span>
-    </div>
-    <div class="stat-item">
-      <span>Escassez:</span>
-      <span>${ENVIRONMENT.resourceScarcity.toFixed(2)}</span>
-    </div>
-  `;
-  
-  // Atualiza estatísticas da população
-  const popStats = document.getElementById('population-stats');
-  const stats = {
-    population: cells.length,
-    avgIntelligence: cells.length > 0 ? 
-      cells.reduce((sum, cell) => sum + cell.genes.intelligence, 0) / cells.length : 
-      0,
-    tribes: cells.filter(cell => cell.tribe).length
-  };
-  
-  popStats.innerHTML = `
-    <div class="stat-item">
-      <span>População:</span>
-      <span>${stats.population}</span>
-    </div>
-    <div class="stat-item">
-      <span>Inteligência Média:</span>
-      <span>${stats.avgIntelligence > 0 ? stats.avgIntelligence.toFixed(2) : '0.00'}</span>
-    </div>
-    <div class="stat-item">
-      <span>Tribos:</span>
-      <span>${stats.tribes}</span>
-    </div>
-  `;
-  
-  // Atualiza eventos históricos
-  const eventsDiv = document.getElementById('historical-events');
-  eventsDiv.innerHTML = HISTORICAL_EVENTS.slice(-5).reverse().map(event => `
-    <div class="event">
-      <strong>${event.event}</strong>
-      <div>${new Date(event.time).toLocaleTimeString()}</div>
-    </div>
-  `).join('');
-  
-  // Atualiza insights
-  const insightsDiv = document.getElementById('insights');
-  const currentInsights = generateInsights();
-  insightsDiv.innerHTML = currentInsights.map(insight => `
-    <div class="insight">
-      ${insight}
-    </div>
-  `).join('');
 }
 
 // Sistema de Insights

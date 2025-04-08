@@ -5,92 +5,115 @@ Uma simulação interativa de um ecossistema artificial que demonstra comportame
 ## 🌟 Características Principais
 
 ### 🧬 Sistema Biológico
-- Células com genes adaptativos
-- Metabolismo dinâmico
+- Células com genes adaptativos (cor, resiliência, inteligência)
+- Metabolismo dinâmico baseado em temperatura
 - Sistema de energia e envelhecimento
-- Reprodução com herança genética
-- Mutações e evolução
+- Reprodução com herança genética e compatibilidade
+- Mutações e evolução gradual
 
 ### 🤝 Sistema Social
 - Formação espontânea de tribos
 - Comportamentos cooperativos
 - Compartilhamento de recursos
-- Especialização de funções
-- Transmissão de conhecimento
+- Especialização de funções (gatherer, hunter, builder, healer)
+- Transmissão de conhecimento entre gerações
 
 ### 🌍 Sistema Ambiental
-- Ciclo de estações
-- Temperatura dinâmica
-- Eventos climáticos
-- Escassez de recursos
-- Catástrofes naturais
+- Ciclo de estações com temperaturas variáveis
+- Escassez dinâmica de recursos
+- Dois tipos de catástrofes naturais:
+  - Terremotos (menor área, menor duração)
+  - Incêndios (maior área, maior duração)
+- Sistema de fuga e adaptação a catástrofes
+
+### 🍎 Sistema de Alimentação
+- Dois tipos de comida:
+  - Normal (verde) - energia básica
+  - Especial (dourada) - bônus de energia e conhecimento
+- Escassez variável por estação e população
+- Comportamento de busca por alimento
+- Sistema de metabolismo adaptativo
 
 ### 💡 Sistema de Inovação
 - Desenvolvimento de ferramentas
-- Acúmulo de conhecimento
-- Evolução tecnológica
+- Acúmulo de conhecimento individual e coletivo
+- Evolução tecnológica tribal
 - Memória coletiva
 - Adaptações culturais
 
-## 📊 Visualização e Análise
+## 📊 Interface e Visualização
 
-- Interface em tempo real
-- Estatísticas populacionais
-- Registro de eventos históricos
-- Insights automáticos
-- Indicadores ambientais
+### Painéis de Informação
+- Estatísticas do Ambiente
+  - Estação atual
+  - Temperatura
+  - Nível de escassez
+- Estatísticas da População
+  - Total de células
+  - Inteligência média
+  - Número de tribos
+- Eventos Históricos
+  - Nascimentos
+  - Mortes
+  - Catástrofes
+  - Descobertas
+- Insights em tempo real
 
-## 🔧 Tecnologias Utilizadas
-
-- HTML5 Canvas
-- JavaScript (ES6+)
-- CSS3
+### Controles Interativos
+- Aumentar chance de catástrofes
+- Controlar escassez de recursos
+- Adicionar comida ao ambiente
+- Visualização de áreas afetadas por catástrofes
 
 ## 🚀 Como Executar
 
 1. Clone o repositório
 2. Abra o arquivo `index.html` em um navegador moderno
-3. A simulação iniciará automaticamente
+3. A simulação iniciará automaticamente com:
+   - 30 células iniciais
+   - 50 unidades de comida
+   - Sistema de eventos históricos ativo
 
 ## 📈 Parâmetros do Sistema
 
 ### Células
 - Energia inicial: 150
-- Idade máxima: 300
+- Idade máxima: 300 frames
 - Taxa de metabolismo: 0.02-0.08
 - Genes: adaptabilidade, inteligência, resiliência
+- Cooldown de reprodução: 60 frames
 
 ### Ambiente
 - Ciclo de estações: 1000 frames
 - Variação de temperatura: -5°C a 35°C
-- Taxa de catástrofes: 0.0001
-- Escassez dinâmica de recursos
+- Taxa base de catástrofes: 0.0001
+- Escassez dinâmica por estação:
+  - Primavera: 0.7
+  - Verão: 0.5
+  - Outono: 0.8
+  - Inverno: 1.2
 
-### Social
-- Raio de interação tribal: 50
-- Cooldown de reprodução: 60
-- Custo de reprodução base: 30
-- Taxa de aprendizado: 0.1
-
-## 🎯 Insights Observáveis
-
-A simulação permite observar diversos fenômenos emergentes:
-
-- Formação espontânea de sociedades
-- Adaptação a mudanças ambientais
-- Desenvolvimento tecnológico
-- Dinâmicas populacionais
-- Comportamentos cooperativos
-- Evolução cultural
+### Reprodução
+- Custo base: 30 energia
+- Compatibilidade genética influencia chance
+- Herança de conhecimento: 60% dos pais
+- Chance de mutação: 10%
 
 ## 🔄 Ciclo de Vida
 
 1. Células nascem com genes aleatórios
-2. Interagem com ambiente e outras células
-3. Formam tribos e compartilham conhecimento
-4. Reproduzem-se passando genes modificados
-5. Adaptam-se às mudanças ambientais
-6. Morrem por idade ou falta de energia
+2. Buscam e consomem recursos
+3. Adaptam-se ao ambiente e catástrofes
+4. Formam tribos e compartilham conhecimento
+5. Reproduzem-se com parceiros compatíveis
+6. Morrem por idade, fome ou catástrofes
+
+## 🛠️ Tecnologias Utilizadas
+
+- HTML5 Canvas para renderização
+- JavaScript ES6+ para lógica
+- CSS3 para interface
+- Sistema de eventos e recuperação de erros
 
 ## 🤝 Contribuições
 
