@@ -1,5 +1,6 @@
 // Configura o canvas e estatísticas
 let canvas, ctx;
+let isMobile = window.innerWidth <= 768;
 
 function initCanvas() {
   try {
@@ -15,8 +16,14 @@ function initCanvas() {
     
     // Ajusta o tamanho do canvas
     function resizeCanvas() {
-      canvas.width = window.innerWidth - 300; // Subtrai a largura do painel de estatísticas
-      canvas.height = window.innerHeight;
+      isMobile = window.innerWidth <= 768;
+      if (isMobile) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight * 0.45; // 45% da altura da tela
+      } else {
+        canvas.width = window.innerWidth - 300; // Subtrai a largura do painel de estatísticas
+        canvas.height = window.innerHeight;
+      }
     }
     
     // Ajusta o tamanho inicial
@@ -144,7 +151,7 @@ class Cell {
     this.metabolismRate = metabolismRate !== undefined ? metabolismRate : rand(0.02, 0.08);
     this.energy = 150;
     this.age = 0;
-    this.radius = 5;
+    this.radius = isMobile ? 7 : 5; // Tamanho maior em dispositivos móveis
     this.dx = rand(-1, 1);
     this.dy = rand(-1, 1);
     this.reproCooldown = 0;
@@ -240,10 +247,20 @@ class Cell {
   }
   
   draw(ctx) {
+    // Desenha a célula com um brilho para melhor visibilidade
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fillStyle = `rgb(${this.genes.r}, ${this.genes.g}, ${this.genes.b})`;
     ctx.fill();
+    
+    // Adiciona brilho para melhor visibilidade em dispositivos móveis
+    if (isMobile) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 255, 255, 0.3)`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
   }
 
   think() {
@@ -376,7 +393,7 @@ class Food {
     this.x = x;
     this.y = y;
     this.energy = rand(30, 50);
-    this.radius = 3;
+    this.radius = isMobile ? 4 : 3; // Tamanho maior em dispositivos móveis
     this.type = Math.random() < 0.3 ? 'special' : 'normal';
     this.color = this.type === 'special' ? 
       `rgb(255, 215, 0)` : // Dourado para comida especial
@@ -388,6 +405,15 @@ class Food {
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fillStyle = this.color;
     ctx.fill();
+    
+    // Adiciona brilho para melhor visibilidade em dispositivos móveis
+    if (isMobile) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 255, 255, 0.3)`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
   }
 }
 
